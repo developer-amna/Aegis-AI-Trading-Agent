@@ -31,8 +31,22 @@ class DebateEngine:
 
     def evaluate_signals(self, payload: Dict[str, Any]) -> AgentDecisionSchema:
         symbol = payload.get("symbol", "UNKNOWN")
-        market_data = payload.get("market_data", {})
-        sentiment_data = payload.get("sentiment_data", {})
+        
+        # Handle flat payload or nested dictionary structures automatically
+        if "market_data" in payload:
+            market_data = payload.get("market_data", {})
+            sentiment_data = payload.get("sentiment_data", {})
+        else:
+            market_data = {
+                "current_price": payload.get("price", "N/A"),
+                "rsi_14": payload.get("rsi", "N/A"),
+                "macd_signal": payload.get("macd_signal", "NEUTRAL"),
+                "volatility_index": payload.get("volatility_index", 0.25)
+            }
+            sentiment_data = {
+                "news_headline_score": payload.get("sentiment_score", 0.0),
+                "overall_sentiment": "BULLISH" if payload.get("sentiment_score", 0) > 0 else "BEARISH"
+            }
 
         candidate_models = [
             "llama-3.3-70b-versatile",
@@ -92,8 +106,12 @@ class DebateEngine:
         print("💡 [Fallback Logic Engine] Executing Quantitative Consensus Rule Engine.")
         news_score = sentiment_data.get("news_headline_score", 0.0)
         rsi = market_data.get("rsi_14", 50.0)
+        if isinstance(rsi, str):
+            rsi = 50.0
         macd = market_data.get("macd_signal", "NEUTRAL")
         volatility = market_data.get("volatility_index", 0.20)
+        if isinstance(volatility, str):
+            volatility = 0.20
 
         normalized_sentiment = (news_score + 1.0) / 2.0
         tech_score = 0.5
@@ -126,6 +144,10 @@ class DebateEngine:
             hedge_required=hedge
         )
 
+    def run_debate(self, payload: Dict[str, Any]) -> AgentDecisionSchema:
+        """Alias for backward compatibility with main execution calls."""
+        return self.evaluate_signals(payload)
+
 
 if __name__ == "__main__":
     sample_input = {
@@ -143,7 +165,7 @@ if __name__ == "__main__":
     }
 
     engine = DebateEngine()
-    output = engine.evaluate_signals(sample_input)
+    output = engine.run_debate(sample_input)
     
     print("\n--- 🏆 TASK 4 WINNER-GRADE OUTPUT JSON CONTRACT ---")
     print(output.model_dump_json(indent=2))
