@@ -106,7 +106,7 @@ with left_col:
         data=csv,
         file_name="trade_execution_log.csv",
         mime="text/csv"
-    )cd AlapcaTradingAgent
+    )
 
 with right_col:
     st.subheader("🤖 Live AI Agent Reasoning Logs")
