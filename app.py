@@ -13,6 +13,79 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# -----------------------------------------------------------------------------
+# CUSTOM EYE-CATCHING LUXURY & TECH STYLING (CSS)
+# -----------------------------------------------------------------------------
+st.markdown("""
+<style>
+    /* Dark Theme Background */
+    .stApp {
+        background-color: #0E1117;
+        color: #E0E0E0;
+    }
+    
+    /* Gold Accent Headers */
+    h1, h2, h3 {
+        color: #D4AF37 !important;
+        font-family: 'Segoe UI', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Custom Styling for Streamlit Metrics */
+    [data-testid="stMetric"] {
+        background: linear-gradient(135deg, #1E222D 0%, #14171F 100%);
+        border: 1px solid #D4AF37;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0px 4px 15px rgba(212, 175, 55, 0.15);
+        transition: all 0.3s ease;
+    }
+    [data-testid="stMetric"]:hover {
+        box-shadow: 0px 4px 20px rgba(212, 175, 55, 0.35);
+        transform: translateY(-2px);
+    }
+    [data-testid="stMetricLabel"] {
+        color: #A0AAB0 !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #FFFFFF !important;
+        font-weight: bold !important;
+    }
+
+    /* Customizing Table/Dataframe */
+    [data-testid="stDataFrame"] {
+        border: 1px solid rgba(212, 175, 55, 0.3);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    /* Customizing Download Button */
+    .stDownloadButton button {
+        background: linear-gradient(90deg, #D4AF37 0%, #AA7C11 100%) !important;
+        color: #0E1117 !important;
+        font-weight: bold !important;
+        border-radius: 8px !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        box-shadow: 0px 0px 10px rgba(212, 175, 55, 0.3);
+        transition: all 0.3s ease;
+    }
+    .stDownloadButton button:hover {
+        box-shadow: 0px 0px 18px rgba(212, 175, 55, 0.7);
+        transform: translateY(-2px);
+    }
+
+    /* Customizing Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #14171F;
+        border-right: 1px solid rgba(212, 175, 55, 0.2);
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Sidebar Controls
 st.sidebar.title("🛡️ AI Control Center")
 st.sidebar.subheader("Filters & Controls")
@@ -65,7 +138,12 @@ with chart_col1:
         "Portfolio Value ($)": base_values
     })
     fig_growth = px.line(growth_data, x="Time", y="Portfolio Value ($)", markers=True, template="plotly_dark")
-    fig_growth.update_traces(line_color='#00FFA3')
+    fig_growth.update_traces(line_color='#00FFA3', line_width=3)
+    fig_growth.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color="#E0E0E0")
+    )
     st.plotly_chart(fig_growth, use_container_width=True)
 
 with chart_col2:
@@ -74,7 +152,19 @@ with chart_col2:
         "Asset": ["AAPL", "NVDA", "TSLA", "BTC", "Cash"],
         "Value ($)": [30000, 25000, 15000, 12750, cash_val]
     })
-    fig_pie = px.pie(allocation_data, names="Asset", values="Value ($)", hole=0.4, template="plotly_dark")
+    fig_pie = px.pie(
+        allocation_data, 
+        names="Asset", 
+        values="Value ($)", 
+        hole=0.4, 
+        template="plotly_dark",
+        color_discrete_sequence=['#D4AF37', '#00FFA3', '#00E5FF', '#FF5252', '#7C4DFF']
+    )
+    fig_pie.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color="#E0E0E0")
+    )
     st.plotly_chart(fig_pie, use_container_width=True)
 
 st.divider()
@@ -106,7 +196,7 @@ with left_col:
         data=csv,
         file_name="trade_execution_log.csv",
         mime="text/csv"
-    )cd AlapcaTradingAgent
+    )
 
 with right_col:
     st.subheader("🤖 Live AI Agent Reasoning Logs")
