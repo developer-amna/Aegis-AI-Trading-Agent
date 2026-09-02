@@ -1,0 +1,23 @@
+{
+  "status": "ok",
+  "totalResults": 2,
+  "articles": [
+    {
+      "source": {"id": "fixture-wire", "name": "Reuters"},
+      "title": "Apple beats quarterly earnings expectations and raises guidance",
+      "description": "Apple reported stronger revenue and demand for its products.",
+      "url": "https://example.test/apple-earnings?utm_source=feed",
+      "publishedAt": "2026-09-02T10:30:00Z",
+      "content": "Apple Inc. beat analyst estimates and raised its full-year outlook as services revenue accelerated."
+    },
+    {
+      "source": {"id": "fixture-wire", "name": "Reuters"},
+      "title": "Tesla cuts delivery forecast after demand weakens",
+      "description": "Tesla reduced its outlook.",
+      "url": "https://example.test/tesla-forecast",
+      "publishedAt": "2026-09-02T10:31:00Z",
+      "content": "Tesla warned that weaker demand would reduce deliveries and margins this year."
+    }
+  ]
+}
+
