@@ -1,404 +1,577 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 import datetime
-import random
-import time
-import itertools
-from contextlib import contextmanager
+import os
+import sys
 
-from market_data import MarketDataCollector
-from debate_engine import DebateEngine
-from backtest_engine import Backtester
+# Ensure current directory is in path for custom module imports
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-collector = MarketDataCollector()
-engine = DebateEngine()
-backtester = Backtester()
+# ---------------------------------------------------------
+# IMPORT BACKEND AGENT MODULES
+# ---------------------------------------------------------
+BACKEND_AVAILABLE = False
+BACKEND_ERROR = None
+try:
+    from market_data import MarketDataCollector
+    from debate_engine import DebateEngine
+    collector = MarketDataCollector()
+    engine = DebateEngine()
+    BACKEND_AVAILABLE = True
+except Exception as e:
+    BACKEND_AVAILABLE = False
+    BACKEND_ERROR = str(e)
 
-# ----------------------------------------------------------------------------
-# Page Configuration
-# ----------------------------------------------------------------------------
+# 1. PAGE CONFIG
 st.set_page_config(
     page_title="AEGIS-AI | Autonomous Trading System",
-    page_icon="🛡️",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# -----------------------------------------------------------------------------
-# CUSTOM EYE-CATCHING LUXURY & TECH STYLING (CSS)
-# -----------------------------------------------------------------------------
+# 2. ADVANCED DARK GLASSMORPHISM STYLING (CSS) - FIXED SIDEBAR VISIBILITY
 st.markdown("""
 <style>
-    /* Dark Theme Background */
     .stApp {
-        background-color: #0E1117;
-        color: #E0E0E0;
+        background-color: #0B0E14;
+        color: #F8FAFC;
+        font-family: 'Inter', system-ui, sans-serif;
     }
-    
-    /* Gold Accent Headers */
-    h1, h2, h3 {
-        color: #D4AF37 !important;
-        font-family: 'Segoe UI', sans-serif;
+    .main-header {
+        background: linear-gradient(135deg, #111622 0%, #1A2333 100%);
+        border: 1px solid #2A364F;
+        padding: 20px 24px;
+        border-radius: 14px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+    .header-left { flex: 1; }
+    .main-title {
+        color: #FFFFFF !important;
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+        margin: 0;
+        line-height: 1.2;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+    .main-subtitle {
+        color: #94A3B8 !important;
+        font-size: 13px;
+        margin-top: 4px;
+        margin-bottom: 0;
+        -webkit-text-fill-color: #94A3B8 !important;
+    }
+    .status-badge-clean {
+        background: rgba(16, 185, 129, 0.15);
+        color: #34D399 !important;
+        border: 1px solid rgba(16, 185, 129, 0.4);
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 11px;
         font-weight: 700;
+        white-space: nowrap;
+        display: inline-block;
         letter-spacing: 0.5px;
     }
-    
-    /* Custom Styling for Streamlit Metrics */
-    [data-testid="stMetric"] {
-        background: linear-gradient(135deg, #1E222D 0%, #14171F 100%);
-        border: 1px solid #D4AF37;
+    .ticker-bar {
+        background: #111622;
+        border: 1px solid #2A364F;
+        padding: 10px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        font-size: 13px;
+        color: #F8FAFC;
+    }
+    .ticker-item { margin-right: 20px; color: #F8FAFC !important; }
+    .green-text { color: #34D399 !important; font-weight: 600; }
+    .red-text { color: #F87171 !important; font-weight: 600; }
+
+    .glass-card {
+        background: rgba(17, 22, 34, 0.85);
+        border: 1px solid #2A364F;
         border-radius: 12px;
-        padding: 15px;
-        box-shadow: 0px 4px 15px rgba(212, 175, 55, 0.15);
-        transition: all 0.3s ease;
+        padding: 16px;
+        box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(8px);
+        margin-bottom: 14px;
+        color: #F8FAFC;
     }
-    [data-testid="stMetric"]:hover {
-        box-shadow: 0px 4px 20px rgba(212, 175, 55, 0.35);
-        transform: translateY(-2px);
+    .card-title {
+        color: #94A3B8 !important;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        margin-bottom: 6px;
+        -webkit-text-fill-color: #94A3B8 !important;
     }
-    [data-testid="stMetricLabel"] {
-        color: #A0AAB0 !important;
-        font-size: 14px !important;
+    .card-value {
+        font-size: 20px;
+        font-weight: 800;
+        color: #FFFFFF !important;
+        white-space: nowrap;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+    .card-sub { font-size: 11px; margin-top: 4px; color: #CBD5E1 !important; }
+    
+    .ai-card {
+        background: linear-gradient(135deg, rgba(30, 27, 75, 0.8) 0%, rgba(17, 22, 34, 0.98) 100%);
+        border: 1px solid #6366F1;
+        border-radius: 12px;
+        padding: 16px;
+        color: #F8FAFC;
+        box-shadow: 0 4px 20px rgba(99, 102, 241, 0.15);
+    }
+    .action-badge {
+        font-weight: 800;
+        padding: 4px 12px;
+        border-radius: 6px;
+        float: right;
+        font-size: 12px;
+    }
+    .bg-buy { background: #34D399; color: #000 !important; }
+    .bg-sell { background: #F87171; color: #FFF !important; }
+    .bg-hold { background: #FBBF24; color: #000 !important; }
+
+    /* --- SIDEBAR HIGH VISIBILITY FIXES --- */
+    section[data-testid="stSidebar"] {
+        background-color: #0F131C;
+        border-right: 1px solid #2A364F;
+    }
+    section[data-testid="stSidebar"] h3, 
+    section[data-testid="stSidebar"] p, 
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] label {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+        color: #94A3B8 !important;
+        -webkit-text-fill-color: #94A3B8 !important;
+    }
+
+    .news-footer {
+        background: #111622;
+        border: 1px solid #2A364F;
+        padding: 12px 18px;
+        border-radius: 10px;
+        font-size: 12px;
+        color: #94A3B8 !important;
+        margin-top: 25px;
+    }
+    .news-footer span, .news-footer b {
+        color: #CBD5E1 !important;
+        -webkit-text-fill-color: #CBD5E1 !important;
+    }
+
+    div.stButton > button, 
+    div.stDownloadButton > button, 
+    div[data-testid="stFormSubmitButton"] > button {
+        background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%) !important;
+        color: #FFFFFF !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+        padding: 8px 16px !important;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3) !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+    div.stButton > button:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 16px rgba(99, 102, 241, 0.5) !important;
+    }
+
+    /* --- Sidebar navigation items styling --- */
+    section[data-testid="stSidebar"] div[role="radiogroup"] {
+        gap: 6px;
+        display: flex;
+        flex-direction: column;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        display: flex !important;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid #2A364F;
+        cursor: pointer;
+        width: 100%;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: rgba(99, 102, 241, 0.12);
+        border-color: rgba(99, 102, 241, 0.4);
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child { display: none; }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label p {
+        color: #CBD5E1 !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        margin: 0 !important;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        background: linear-gradient(135deg, #6366F1 0%, #4338CA 100%) !important;
+        border-color: #818CF8 !important;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+    }
+
+    div[data-testid="stWidgetLabel"] *, label[data-testid="stWidgetLabel"] p {
+        color: #FFFFFF !important;
         font-weight: 600 !important;
     }
-    [data-testid="stMetricValue"] {
-        color: #FFFFFF !important;
-        font-weight: bold !important;
-    }
-
-    /* Customizing Table/Dataframe */
-    [data-testid="stDataFrame"] {
-        border: 1px solid rgba(212, 175, 55, 0.3);
-        border-radius: 10px;
-        overflow: hidden;
-    }
-
-    /* Customizing Download Button */
-    .stDownloadButton button {
-        background: linear-gradient(90deg, #D4AF37 0%, #AA7C11 100%) !important;
-        color: #0E1117 !important;
-        font-weight: bold !important;
-        border-radius: 8px !important;
-        border: none !important;
-        padding: 10px 24px !important;
-        box-shadow: 0px 0px 10px rgba(212, 175, 55, 0.3);
-        transition: all 0.3s ease;
-    }
-    .stDownloadButton button:hover {
-        box-shadow: 0px 0px 18px rgba(212, 175, 55, 0.7);
-        transform: translateY(-2px);
-    }
-
-    /* Customizing Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #14171F;
-        border-right: 1px solid rgba(212, 175, 55, 0.2);
-    }
+    .stDataFrame { border-radius: 8px; overflow: hidden; border: 1px solid #2A364F; }
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------------------------------------------------------------------
-# Theme tokens
-# ----------------------------------------------------------------------------
-BG = "#0a0e1f"
-CARD_BG = "#12172c"
-CARD_BORDER = "rgba(139, 92, 246, 0.18)"
-PURPLE = "#8b5cf6"
-BLUE = "#3b82f6"
-GREEN = "#00d68f"
-RED = "#ef4444"
-AMBER = "#f5a623"
-TEXT_PRIMARY = "#e8eaf2"
-TEXT_MUTED = "#8b91a8"
+# 3. SIDEBAR NAVIGATION
+with st.sidebar:
+    st.markdown("<h2 style='color:#FFFFFF; font-size:20px; margin-bottom:0;'>⚡ AEGIS-AI</h2>", unsafe_allow_html=True)
+    st.caption("Autonomous Trading System")
+    st.markdown("---")
+    
+    st.markdown("### Navigation")
+    menu = st.radio(
+        "", 
+        ["🏠 Dashboard", "📈 Market Overview", "🤖 AI Decisions", "💼 Portfolio", "🛡️ Risk Management", "⚙️ Settings"], 
+        label_visibility="collapsed"
+    )
+    
+    st.markdown("---")
+    st.markdown("### Testing Controls")
+    if st.button("⚠️ Simulate Unsafe Trade", use_container_width=True):
+        st.error("🛑 RISK ALERT: High-Leverage Order Intercepted & Blocked!")
 
-st.markdown(f"""
-<style>
-    .stApp {{ background-color: {BG}; color: {TEXT_PRIMARY}; }}
-    section[data-testid="stSidebar"] {{
-        background-color: #0d1225;
-        border-right: 1px solid {CARD_BORDER};
-    }}
-    #MainMenu, footer, header {{ visibility: hidden; }}
-
-    .brand {{ display:flex; align-items:center; gap:10px; padding: 4px 4px 18px 4px; }}
-    .brand-icon {{
-        width: 42px; height: 42px; border-radius: 12px;
-        background: linear-gradient(135deg, {PURPLE}, {BLUE});
-        display:flex; align-items:center; justify-content:center; font-size:20px;
-    }}
-    .brand-title {{ font-size: 18px; font-weight: 800; color: {TEXT_PRIMARY}; line-height:1.1; }}
-    .brand-sub {{ font-size: 11px; color: {TEXT_MUTED}; }}
-
-    .ai-status-card {{
-        background: {CARD_BG}; border: 1px solid {CARD_BORDER};
-        border-radius: 14px; padding: 14px; margin-top: 14px;
-    }}
-    .ai-status-title {{ font-size: 13px; font-weight: 600; color: {TEXT_PRIMARY}; }}
-    .ai-status-dot {{ color: {GREEN}; font-size: 12px; }}
-
-    .ticker-bar {{
-        display: flex; align-items: center; gap: 32px;
-        background: {CARD_BG}; border: 1px solid {CARD_BORDER};
-        border-radius: 14px; padding: 14px 22px; margin-bottom: 20px;
-    }}
-    .ticker-item {{ font-size: 15px; color: {TEXT_PRIMARY}; white-space: nowrap; }}
-    .ticker-item span.sym {{ color: {TEXT_MUTED}; margin-right: 6px; }}
-    .ticker-up {{ color: {GREEN}; }}
-    .ticker-down {{ color: {RED}; }}
-    .status-pill {{
-        margin-left: auto; background: rgba(0, 214, 143, 0.12); color: {GREEN};
-        border: 1px solid rgba(0, 214, 143, 0.35); border-radius: 20px;
-        padding: 5px 14px; font-size: 13px; font-weight: 600; white-space: nowrap;
-    }}
-
-    .metric-card {{
-        background: {CARD_BG}; border: 1px solid {CARD_BORDER};
-        border-radius: 16px; padding: 16px 18px; height: 100%;
-    }}
-    .metric-label {{ color: {TEXT_MUTED}; font-size: 12px; margin-bottom: 8px; }}
-    .metric-value {{ color: {TEXT_PRIMARY}; font-size: 24px; font-weight: 700; }}
-    .metric-sub {{ font-size: 12px; margin-top: 5px; }}
-
-    .panel-title {{ font-size: 14px; font-weight: 600; color: {TEXT_PRIMARY}; margin-bottom: 14px; }}
-
-    .row-line {{
-        display:flex; justify-content: space-between; align-items:center;
-        padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px;
-    }}
-    .row-line:last-child {{ border-bottom: none; }}
-    .row-label {{ color: {TEXT_MUTED}; }}
-    .row-value {{ color: {TEXT_PRIMARY}; font-weight: 600; }}
-
-    .decision-badge {{
-        display: inline-block; padding: 6px 18px; border-radius: 8px;
-        font-weight: 700; font-size: 14px;
-    }}
-    .badge-buy {{ background: rgba(0, 214, 143, 0.15); color: {GREEN}; }}
-    .badge-sell {{ background: rgba(239, 68, 68, 0.15); color: {RED}; }}
-    .badge-hold {{ background: rgba(139, 146, 168, 0.15); color: {TEXT_MUTED}; }}
-
-    .news-bar {{
-        background: {CARD_BG}; border: 1px solid {CARD_BORDER}; border-radius: 14px;
-        padding: 12px 20px; display:flex; align-items:center; gap: 24px;
-        font-size: 13px; color: {TEXT_MUTED}; margin-top: 6px; flex-wrap: wrap;
-    }}
-
-    div[data-testid="stDataFrame"] {{ border-radius: 12px; overflow: hidden; }}
-
-    /* --- Sidebar nav list (mirrors the reference dashboard) --- */
-    section[data-testid="stSidebar"] div[role="radiogroup"] {{ gap: 3px; }}
-    section[data-testid="stSidebar"] div[role="radiogroup"] label {{
-        display: flex; align-items: center; gap: 10px;
-        padding: 10px 14px; border-radius: 12px;
-        color: {TEXT_MUTED}; font-size: 14px; font-weight: 500;
-        cursor: pointer; transition: background 0.15s ease; width: 100%;
-    }}
-    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {{
-        background: rgba(255,255,255,0.04);
-    }}
-    section[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {{
-        display: none;
-    }}
-    section[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked),
-    section[data-testid="stSidebar"] div[role="radiogroup"] label[aria-checked="true"] {{
-        background: linear-gradient(90deg, {PURPLE}, {BLUE});
-        color: #ffffff; font-weight: 700;
-        box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);
-    }}
-
-    /* --- Buttons (match dark theme instead of Streamlit's default white) --- */
-    .stButton > button, .stDownloadButton > button {{
-        background: linear-gradient(90deg, {PURPLE}, {BLUE});
-        color: #ffffff; border: none; border-radius: 10px;
-        font-weight: 600; padding: 0.55rem 1rem;
-    }}
-    .stButton > button:hover, .stDownloadButton > button:hover {{
-        filter: brightness(1.12); color: #ffffff;
-    }}
-    section[data-testid="stSidebar"] .stButton > button {{
-        background: rgba(239, 68, 68, 0.15); color: {RED};
-        border: 1px solid rgba(239, 68, 68, 0.35);
-    }}
-</style>
-""", unsafe_allow_html=True)
-
-# ----------------------------------------------------------------------------
-# panel(): draws a bordered container styled as a dark card, with a title.
-# Uses a hidden marker span + CSS :has() so the title AND any native
-# Streamlit widgets (charts, tables, buttons) placed inside render inside
-# the SAME visual box, instead of Streamlit splitting raw HTML divs from
-# native widgets into separate boxes.
-# ----------------------------------------------------------------------------
-_panel_seq = itertools.count()
-
-@contextmanager
-def panel(title: str):
-    marker = f"pnl-{next(_panel_seq)}"
-    box = st.container(border=True)
-    with box:
-        st.markdown(
-            f'<span class="{marker}"></span><div class="panel-title">{title}</div>',
-            unsafe_allow_html=True
-        )
-        yield
-    st.markdown(f"""
-    <style>
-        div[data-testid="stVerticalBlockBorderWrapper"]:has(span.{marker}) {{
-            background: {CARD_BG} !important;
-            border: 1px solid {CARD_BORDER} !important;
-            border-radius: 16px !important;
-        }}
-    </style>
+    st.markdown("---")
+    st.markdown("""
+    <div class="glass-card" style="text-align:center; padding:12px;">
+        <div style="font-size:20px;">🧠</div>
+        <div style="font-weight:bold; color:#A5B4FC; font-size:12px; margin-top:4px;">Agent Status</div>
+        <div style="color:#34D399; font-size:11px; margin-top:2px; font-weight:600;">● Fully Operational</div>
+        <div style="color:#64748B; font-size:10px; margin-top:2px;">Latency: 12ms</div>
+    </div>
     """, unsafe_allow_html=True)
 
+# 4. PAGES ROUTING
 
-# ----------------------------------------------------------------------------
-# Sidebar
-# ----------------------------------------------------------------------------
-st.sidebar.markdown("""
-<div class="brand">
-    <div class="brand-icon">🛡️</div>
-    <div>
-        <div class="brand-title">AEGIS-AI</div>
-        <div class="brand-sub">Autonomous Trading System</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-NAV_ITEMS = [
-    ("🏠", "Dashboard"), ("📈", "Market Overview"), ("💡", "AI Decisions"),
-    ("💼", "Portfolio"), ("🧮", "Options Chain"), ("🛡️", "Risk Management"),
-    ("🧾", "Trade History"), ("📊", "Performance"), ("📰", "News & Sentiment"),
-    ("🗒️", "System Logs"), ("⚙️", "Settings"),
-]
-active_page = st.sidebar.radio("Navigate", [f"{i} {l}" for i, l in NAV_ITEMS],
-                                index=0, label_visibility="collapsed")
-active_label = active_page.split(" ", 1)[1]
-
-with st.sidebar.expander("⚙️ Quick Controls", expanded=False):
-    symbol = st.text_input("Stock Ticker", value="AAPL").upper()
-    timeframe = st.selectbox("Timeframe", ["Live (1D)", "1 Week", "1 Month", "1 Year"])
-    risk_level = st.slider("AI Risk Tolerance", 1, 10, 4)
-    auto_refresh = st.checkbox("Enable Live Updates", value=False)
-    refresh_rate = st.slider("Refresh Interval (s)", 2, 10, 3)
-    trigger_unsafe_trade = st.button("🚨 Simulate Unsafe Trade", use_container_width=True)
-
-st.sidebar.markdown(f"""
-<div class="ai-status-card">
-    <div class="ai-status-title">🧠 AI System Status</div>
-    <div style="margin-top:8px;"><span class="ai-status-dot">●</span> All Systems Operational</div>
-    <div style="color:{TEXT_MUTED}; font-size:12px; margin-top:4px;">
-        Last Check: {datetime.datetime.now().strftime('%I:%M:%S %p')}
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# ----------------------------------------------------------------------------
-# Top ticker bar
-# ----------------------------------------------------------------------------
-now_str = datetime.datetime.now().strftime("%b %d, %Y  %I:%M:%S %p")
-st.markdown(f"""
-<div class="ticker-bar">
-    <div class="ticker-item"><span class="sym">SPY</span>531.52 <span class="ticker-up">▲ 0.68%</span></div>
-    <div class="ticker-item"><span class="sym">QQQ</span>452.81 <span class="ticker-up">▲ 0.72%</span></div>
-    <div class="ticker-item"><span class="sym">VIX</span>14.35 <span class="ticker-down">▼ 1.65%</span></div>
-    <div class="status-pill">● SYSTEM ONLINE</div>
-    <div class="ticker-item" style="color:{TEXT_MUTED}; font-size:13px;">{now_str}</div>
-</div>
-""", unsafe_allow_html=True)
-
-if active_label != "Dashboard":
-    with panel(active_label):
-        st.markdown(f"""
-        <div style="text-align:center; padding: 50px 10px;">
-            <div style="font-size:32px; margin-bottom:10px;">🚧</div>
-            <div style="color:{TEXT_MUTED}; font-size:13px;">
-                This section isn't wired up yet — Dashboard is the fully built page for the demo.
-            </div>
+# ==========================================
+# PAGE 1: MAIN DASHBOARD
+# ==========================================
+if menu == "🏠 Dashboard":
+    st.markdown("""
+    <div class="main-header">
+        <div class="header-left">
+            <h1 class="main-title">⚡ AEGIS-AI TRADING SYSTEM</h1>
+            <p class="main-subtitle">Autonomous Real-Time Risk Management & Execution Engine</p>
         </div>
-        """, unsafe_allow_html=True)
-    st.stop()
+        <div>
+            <span class="status-badge-clean">🟢 LIVE AGENT ACTIVE</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# ============================================================================
-# DASHBOARD PAGE
-# ============================================================================
-st.markdown(f"<h2 style='margin-bottom:2px;'>🛡️ Aegis Autonomous AI Trading Dashboard</h2>", unsafe_allow_html=True)
-st.markdown(f"<p style='color:{TEXT_MUTED}; margin-top:0;'>Real-time portfolio tracking, multi-agent debate reasoning, and trade execution.</p>", unsafe_allow_html=True)
+    st.markdown("""
+    <div class="ticker-bar">
+        <div>
+            <span class="ticker-item"><b>SPY</b> 531.52 <span class="green-text">▲ 0.68%</span></span>
+            <span class="ticker-item"><b>QQQ</b> 452.81 <span class="green-text">▲ 0.72%</span></span>
+            <span class="ticker-item"><b>VIX</b> 14.35 <span class="red-text">▼ -1.65%</span></span>
+        </div>
+        <div>
+            <span style="color:#94A3B8; font-size:12px; font-weight:600;">Sep 03, 2026 | 03:29 PM</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-if trigger_unsafe_trade:
-    st.error("🚨 **SECURITY ALERT:** High-frequency arbitrage bot attempted a high-leverage trade (100x BTC). **ACTION: BLOCKED BY RISK-MANAGER AGENT**")
+    kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
+    with kpi1:
+        st.markdown('<div class="glass-card"><div class="card-title">Portfolio Value</div><div class="card-value">$104,528</div><div class="card-sub green-text">+$2,356 (2.3%)</div></div>', unsafe_allow_html=True)
+    with kpi2:
+        st.markdown('<div class="glass-card"><div class="card-title">Total Return</div><div class="card-value">4.53%</div><div class="card-sub green-text">+$4,528 All Time</div></div>', unsafe_allow_html=True)
+    with kpi3:
+        st.markdown('<div class="glass-card"><div class="card-title">Win Rate</div><div class="card-value">68.4%</div><div class="card-sub" style="color:#A5B4FC; font-weight:600;">26 / 38 Trades</div></div>', unsafe_allow_html=True)
+    with kpi4:
+        st.markdown('<div class="glass-card"><div class="card-title">Sharpe Ratio</div><div class="card-value">2.18</div><div class="card-sub green-text">Excellent</div></div>', unsafe_allow_html=True)
+    with kpi5:
+        st.markdown('<div class="glass-card"><div class="card-title">Max Drawdown</div><div class="card-value">1.32%</div><div class="card-sub green-text">Controlled</div></div>', unsafe_allow_html=True)
 
-# Charts Section
-chart_col1, chart_col2 = st.columns([2, 1])
+    st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
 
-with chart_col1:
-    st.subheader("📈 Portfolio Value Growth")
-    time_series = pd.date_range(end=datetime.datetime.now(), periods=10, freq="1h")
-    base_values = [100000, 100500, 101200, 100800, 102000, 102500, 103100, 104000, 104200, portfolio_val]
-    growth_data = pd.DataFrame({
-        "Time": time_series,
-        "Portfolio Value ($)": base_values
-    })
-    fig_growth = px.line(growth_data, x="Time", y="Portfolio Value ($)", markers=True, template="plotly_dark")
-    fig_growth.update_traces(line_color='#00FFA3')
-    st.plotly_chart(fig_growth, use_container_width=True)
+    left_col, right_col = st.columns([2.1, 1.1], gap="medium")
 
-with chart_col2:
-    st.subheader("📊 Asset Allocation")
-    allocation_data = pd.DataFrame({
-        "Asset": ["AAPL", "NVDA", "TSLA", "BTC", "Cash"],
-        "Value ($)": [30000, 25000, 15000, 12750, cash_val]
-    })
-    fig_pie = px.pie(allocation_data, names="Asset", values="Value ($)", hole=0.4, template="plotly_dark")
-    st.plotly_chart(fig_pie, use_container_width=True)
+    with left_col:
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title" style="margin-bottom: 8px;">📈 Portfolio Performance (30 Days)</div>', unsafe_allow_html=True)
+        
+        dates = pd.date_range(end=datetime.datetime.now(), periods=30, freq="D")
+        values = [96000 + i*300 + (i%3)*400 - (i%2)*200 for i in range(30)]
+        values[-1] = 104528.63
 
-st.divider()
+        fig_main = go.Figure()
+        fig_main.add_trace(go.Scatter(
+            x=dates, y=values, mode='lines+markers',
+            line=dict(color='#818CF8', width=3, shape='spline', smoothing=1.1),
+            marker=dict(size=0),
+            fill='tozeroy',
+            fillcolor='rgba(99, 102, 241, 0.18)',
+            hovertemplate='<b>%{x|%b %d}</b><br>$%{y:,.2f}<extra></extra>',
+        ))
+        fig_main.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+            margin=dict(l=10, r=10, t=10, b=10), height=240,
+            showlegend=False,
+            hovermode='x unified',
+            xaxis=dict(showgrid=False, color='#64748B', showline=True, linecolor='#2A364F'),
+            yaxis=dict(showgrid=True, gridcolor='rgba(255, 255, 255, 0.04)', color='#64748B', tickprefix='$', tickformat=',.0f'),
+            font=dict(color='#F1F5F9', size=11),
+        )
+        st.plotly_chart(fig_main, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# Trade History & AI Agent Logs
-left_col, right_col = st.columns([2, 1])
+        sub_c1, sub_c2 = st.columns(2)
+        with sub_c1:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            st.markdown('<div class="card-title" style="margin-bottom: 8px;">🌐 Market Overview</div>', unsafe_allow_html=True)
+            market_df = pd.DataFrame({
+                "Index": ["S&P 500", "NASDAQ", "DOW", "VIX"], 
+                "Value": ["5,312", "18,302", "38,840", "14.35"], 
+                "Chg": ["+0.65%", "+0.92%", "+0.35%", "-1.65%"]
+            })
+            st.dataframe(market_df, use_container_width=True, hide_index=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-with left_col:
-    with panel("📊 Recent Trade Execution History"):
-        trades_data = pd.DataFrame({
-            "Timestamp": [
-                datetime.datetime.now().strftime("%H:%M:%S"),
-                (datetime.datetime.now() - datetime.timedelta(minutes=3)).strftime("%H:%M:%S"),
-                (datetime.datetime.now() - datetime.timedelta(minutes=8)).strftime("%H:%M:%S"),
-                (datetime.datetime.now() - datetime.timedelta(minutes=15)).strftime("%H:%M:%S")
-            ],
-            "Symbol": [symbol, "NVDA", "TSLA", "BTC/USD"],
-            "Action": ["BUY", "SELL", "BUY", "BLOCK"],
-            "Quantity": [10, 5, 12, 0.5],
-            "Price ($)": [224.50, 128.30, 210.00, 64200.00],
-            "Status": ["Executed", "Executed", "Executed", "🚫 Blocked (Unsafe)"]
+        with sub_c2:
+            st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+            st.markdown('<div class="card-title" style="margin-bottom: 8px;">⚡ Open Positions</div>', unsafe_allow_html=True)
+            pos_df = pd.DataFrame({
+                "Symbol": ["AAPL", "MSFT", "TSLA", "BTC"], 
+                "Type": ["BUY", "BUY", "BUY", "BLOCK"], 
+                "P&L": ["+$1,125", "+$780", "-$120", "Block"]
+            })
+            st.dataframe(pos_df, use_container_width=True, hide_index=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with right_col:
+        st.markdown('<div class="card-title" style="margin-bottom: 6px;">🤖 Latest AI Agent Decision</div>', unsafe_allow_html=True)
+        if BACKEND_AVAILABLE:
+            try:
+                payload = collector.fetch_stock_payload("AAPL")
+                decision = engine.run_debate(payload)
+                
+                act_cls = "bg-buy" if decision.action == "BUY" else ("bg-sell" if decision.action == "SELL" else "bg-hold")
+                conf_perc = int(decision.confidence * 100) if decision.confidence <= 1.0 else int(decision.confidence)
+                rsi_val = payload.get("market_data", {}).get("rsi_14", "N/A")
+                price_val = payload.get("market_data", {}).get("current_price", "N/A")
+                
+                st.markdown(f"""
+                <div class="ai-card" style="margin-bottom: 14px;">
+                    <span class="action-badge {act_cls}">{decision.action}</span>
+                    <div style="font-size:18px; font-weight:bold; color:#FFFFFF;">{decision.symbol}</div>
+                    <div style="color:#94A3B8; font-size:12px; margin-top:3px;">RSI: {rsi_val} | Volatility Checked</div>
+                    <hr style="border-color:#2A364F; margin:10px 0;">
+                    <div style="display:flex; justify-content:space-between; font-size:13px; color:#F1F5F9;">
+                        <span>Confidence: <b style="color:#34D399;">{conf_perc}%</b></span>
+                        <span>Price: <b style="color:#FFFFFF;">${price_val}</b></span>
+                    </div>
+                    <div style="font-size:11px; color:#CBD5E1; margin-top:8px; background:rgba(0,0,0,0.35); padding:8px; border-radius:6px; border: 1px solid #2A364F; line-height: 1.4;">
+                        <b style="color:#FFFFFF;">Consensus:</b> {decision.reasoning}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            except Exception as e:
+                st.warning(f"Backend processing error: {e}")
+        else:
+            st.info("Backend files missing. Showing cached state.")
+
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title" style="margin-bottom: 4px;">💼 Asset Allocation</div>', unsafe_allow_html=True)
+        fig_alloc = px.pie(names=['Equities', 'Options', 'Cash', 'Others'], values=[60.2, 25.7, 10.1, 4.0], hole=0.6, color_discrete_sequence=['#818CF8', '#A78BFA', '#34D399', '#FBBF24'])
+        fig_alloc.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+            margin=dict(l=0, r=0, t=0, b=0), height=170, 
+            showlegend=True, 
+            legend=dict(orientation="h", y=-0.15, font=dict(size=10, color='#CBD5E1')), 
+            font=dict(color='#F1F5F9')
+        )
+        st.plotly_chart(fig_alloc, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# ==========================================
+# PAGE 2: MARKET OVERVIEW
+# ==========================================
+elif menu == "📈 Market Overview":
+    st.title("📈 Market Overview & Analytics")
+    st.markdown('<p style="color:#FFFFFF; font-weight:600; font-size:13px; margin-bottom:4px;">Filter Market Sector</p>', unsafe_allow_html=True)
+    selected_sector = st.selectbox("", ["All Sectors", "Technology", "Healthcare", "Financials", "Energy"], label_visibility="collapsed")
+    
+    m_col1, m_col2 = st.columns([2, 1])
+    with m_col1:
+        st.write("### Sector Momentum")
+        sectors = pd.DataFrame({
+            "Sector": ["Technology", "Healthcare", "Financials", "Energy", "Consumer Discretionary"],
+            "Market Cap ($B)": [2800, 1500, 1900, 850, 1200],
+            "Daily Change (%)": [1.85, -0.42, 0.95, -1.20, 0.65]
         })
-        st.dataframe(trades_data, use_container_width=True, hide_index=True)
-        csv = trades_data.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Export Trade Execution Log (CSV)", data=csv,
-                            file_name="trade_execution_log.csv", mime="text/csv")
+        if selected_sector != "All Sectors":
+            sectors = sectors[sectors["Sector"] == selected_sector]
+        fig_bar = px.bar(sectors, x="Sector", y="Daily Change (%)", color="Daily Change (%)", color_continuous_scale="RdYlGn", template="plotly_dark")
+        fig_bar.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#F1F5F9'))
+        st.plotly_chart(fig_bar, use_container_width=True)
 
-with right_col:
-    with panel("🤖 Live AI Agent Status Logs"):
-        st.error("🛑 **Risk-Manager Agent:** Blocked high-risk BTC buy order due to high volatility.")
-        st.success(f"🔵 **Trend-Follower Agent:** Executed BUY {symbol} 10 shares based on technical breakout.")
-        st.warning("🟠 **Sentiment Agent:** Flagged news volatility spike for TSLA.")
+    with m_col2:
+        st.write("### Global Benchmark Indices")
+        indices_data = pd.DataFrame({
+            "Index": ["S&P 500", "NASDAQ 100", "DOW JONES", "FTSE 100", "NIKKEI 225"],
+            "Price": ["5,312.8", "18,302", "38,840", "8,210", "38,500"],
+            "Trend": ["Bullish", "Bullish", "Neutral", "Bearish", "Bullish"]
+        })
+        st.dataframe(indices_data, use_container_width=True, hide_index=True)
 
-# ----------------------------------------------------------------------------
-# Bottom — AI News Feed
-# ----------------------------------------------------------------------------
-st.markdown(f"""
-<div class="news-bar">
-    <span style="color:{TEXT_PRIMARY}; font-weight:600;">📰 AI NEWS FEED</span>
-    <span>Fed officials signal caution on rate cuts &nbsp;·&nbsp; 10:30 AM</span>
-    <span>Apple unveils new AI features at WWDC &nbsp;·&nbsp; 09:45 AM</span>
-    <span>Tech stocks rally on strong earnings &nbsp;·&nbsp; 09:15 AM</span>
+# ==========================================
+# PAGE 3: AI DECISIONS
+# ==========================================
+elif menu == "🤖 AI Decisions":
+    st.title("🤖 Multi-Agent Consensus & Debate Engine")
+    st.write("### Live Asset Analysis & Debate")
+    
+    col_input, col_btn = st.columns([3, 1])
+    with col_input:
+        st.markdown('<p style="color:#FFFFFF; font-weight:600; font-size:13px; margin-bottom:4px;">Enter Ticker Symbol to Evaluate</p>', unsafe_allow_html=True)
+        target_symbol = st.text_input("", value="NVDA", label_visibility="collapsed").upper()
+    with col_btn:
+        st.write(" ")
+        run_analysis = st.button("🧠 Run Agent Debate", use_container_width=True)
+        
+    if run_analysis:
+        if BACKEND_AVAILABLE:
+            with st.spinner(f"Running Bull, Bear & Risk Manager Agents for {target_symbol}..."):
+                try:
+                    payload = collector.fetch_stock_payload(target_symbol, risk_tolerance=5)
+                    decision = engine.run_debate(payload)
+                    
+                    res_col1, res_col2 = st.columns([1, 2])
+                    with res_col1:
+                        conf_str = f"{int(decision.confidence * 100)}%" if decision.confidence <= 1.0 else f"{decision.confidence}%"
+                        risk_status_text = "APPROVED" if getattr(decision, 'risk_approved', True) else "BLOCKED BY RISK"
+                        risk_color = "#34D399" if getattr(decision, 'risk_approved', True) else "#F87171"
+
+                        st.markdown(f"""
+                        <div class="glass-card" style="border: 2px solid #6366F1;">
+                            <h3 style="color:#FFF; margin-top:0;">{decision.symbol}</h3>
+                            <p style="margin-bottom:6px; color:#CBD5E1;">Action: <b style="color:#34D399;">{decision.action}</b></p>
+                            <p style="margin-bottom:6px; color:#CBD5E1;">Confidence: <b style="color:#FFFFFF;">{conf_str}</b></p>
+                            <p style="margin-bottom:0; color:#CBD5E1;">Risk Check: <b style="color:{risk_color};">{risk_status_text}</b></p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with res_col2:
+                        st.success(f"**Bull Case:** {decision.bull_case}")
+                        st.error(f"**Bear Case:** {decision.bear_case}")
+                        st.info(f"**Final Consensus:** {decision.reasoning}")
+                except Exception as ex:
+                    st.error(f"Execution Error: {ex}")
+        else:
+            st.error("Backend modules missing.")
+        
+    st.markdown("---")
+    st.write("### Execution History Logs")
+    ai_history = pd.DataFrame({
+        "Timestamp": ["10:42:15", "10:35:00", "10:12:44", "09:50:11", "09:30:00"],
+        "Ticker": ["AAPL", "NVDA", "TSLA", "BTC/USD", "MSFT"],
+        "Action": ["BUY", "HOLD", "SELL", "BLOCK", "BUY"],
+        "Price": ["$185.50", "$124.10", "$212.40", "$67,400", "$420.15"],
+        "Confidence": ["85%", "91%", "78%", "99%", "92%"]
+    })
+    st.dataframe(ai_history, use_container_width=True, hide_index=True)
+    csv_logs = ai_history.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Export Logs (CSV)", csv_logs, "execution_logs.csv", "text/csv")
+
+# ==========================================
+# PAGE 4: PORTFOLIO
+# ==========================================
+elif menu == "💼 Portfolio":
+    st.title("💼 Portfolio Holdings")
+    p_col1, p_col2 = st.columns([1.5, 1])
+    with p_col1:
+        holdings = pd.DataFrame({
+            "Asset": ["Apple Inc. (AAPL)", "NVIDIA (NVDA)", "Tesla (TSLA)", "Bitcoin (BTC)", "Cash Reserve"],
+            "Units": ["50", "30", "20", "0.5", "-"],
+            "Avg Price": ["$175.20", "$110.00", "$215.00", "$60,100", "-"],
+            "Value": ["$9,275", "$3,849", "$4,200", "$32,100", "$22,100"]
+        })
+        st.dataframe(holdings, use_container_width=True, hide_index=True)
+
+    with p_col2:
+        fig_p_pie = px.pie(names=["AAPL", "NVDA", "TSLA", "BTC", "Cash"], values=[9275, 3849, 4200, 32100, 22100], hole=0.5, template="plotly_dark")
+        fig_p_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#F1F5F9', size=12))
+        st.plotly_chart(fig_p_pie, use_container_width=True)
+
+# ==========================================
+# PAGE 5: RISK MANAGEMENT
+# ==========================================
+elif menu == "🛡️ Risk Management":
+    st.title("🛡️ Risk Management Panel")
+    r_col1, r_col2 = st.columns(2)
+    with r_col1:
+        with st.form("risk_form"):
+            st.write("### Safety Parameters")
+            st.slider("Max Allocation per Trade (%)", 1, 20, 2)
+            st.slider("Auto Stop-Loss Trigger (%)", 0.5, 5.0, 1.5)
+            st.markdown('<p style="color:#FFFFFF; font-weight:600; font-size:13px; margin-bottom:4px;">Agent Risk Mode</p>', unsafe_allow_html=True)
+            st.selectbox("", ["Conservative (Low)", "Balanced (Medium)", "Aggressive (High)"], label_visibility="collapsed")
+            st.toggle("Enable AI Interception Guardrail", value=True)
+            st.form_submit_button("💾 Save Risk Settings")
+
+    with r_col2:
+        st.write("### Recent Risk Interceptions")
+        risk_logs = pd.DataFrame({
+            "Time": ["10:00:05", "Yesterday", "2 Days Ago"],
+            "Attempted Trade": ["100x BTC Futures", "TSLA Market Order $50k", "MEME Token Arbitrage"],
+            "Violation": ["Exceeded Max Leverage", "Position Size Over Allocation", "Low Liquidity Asset"],
+            "Status": ["BLOCKED", "BLOCKED", "BLOCKED"]
+        })
+        st.dataframe(risk_logs, use_container_width=True, hide_index=True)
+
+# ==========================================
+# PAGE 6: SETTINGS
+# ==========================================
+elif menu == "⚙️ Settings":
+    st.title("⚙️ System Preferences")
+    with st.form("settings_form"):
+        s_col1, s_col2 = st.columns(2)
+        with s_col1:
+            st.write("### API Connections")
+            st.markdown('<p style="color:#FFFFFF; font-weight:600; font-size:13px; margin-bottom:4px;">Alpaca API Key</p>', unsafe_allow_html=True)
+            st.text_input("", value="PK******************", type="password", label_visibility="collapsed")
+            st.markdown('<p style="color:#FFFFFF; font-weight:600; font-size:13px; margin-bottom:4px;">Groq LLM Key</p>', unsafe_allow_html=True)
+            st.text_input("", value="gsk_*****************", type="password", label_visibility="collapsed")
+        with s_col2:
+            st.write("### Notifications")
+            st.checkbox("Enable Telegram Alerts", value=True)
+            st.checkbox("Enable Daily Email Summaries", value=True)
+        st.form_submit_button("⚡ Save Configuration")
+
+# 5. BOTTOM NEWS TICKER FOOTER
+st.markdown("""
+<div class="news-footer">
+    <b>📡 LIVE AI NEWS FEED:</b> &nbsp;&nbsp; 
+    <span>Fed officials signal caution on rate cuts (10:30 AM)</span> &nbsp;&nbsp;|&nbsp;&nbsp; 
+    <span style="color:#A5B4FC;">Apple unveils new AI features (09:45 AM)</span> &nbsp;&nbsp;|&nbsp;&nbsp; 
+    <span>Tech stocks rally on strong earnings (09:15 AM)</span>
 </div>
 """, unsafe_allow_html=True)
-
-# ----------------------------------------------------------------------------
-# Auto-refresh
-# ----------------------------------------------------------------------------
-if auto_refresh:
-    time.sleep(refresh_rate)
-    st.rerun()
