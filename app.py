@@ -25,6 +25,79 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# -----------------------------------------------------------------------------
+# CUSTOM EYE-CATCHING LUXURY & TECH STYLING (CSS)
+# -----------------------------------------------------------------------------
+st.markdown("""
+<style>
+    /* Dark Theme Background */
+    .stApp {
+        background-color: #0E1117;
+        color: #E0E0E0;
+    }
+    
+    /* Gold Accent Headers */
+    h1, h2, h3 {
+        color: #D4AF37 !important;
+        font-family: 'Segoe UI', sans-serif;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    
+    /* Custom Styling for Streamlit Metrics */
+    [data-testid="stMetric"] {
+        background: linear-gradient(135deg, #1E222D 0%, #14171F 100%);
+        border: 1px solid #D4AF37;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0px 4px 15px rgba(212, 175, 55, 0.15);
+        transition: all 0.3s ease;
+    }
+    [data-testid="stMetric"]:hover {
+        box-shadow: 0px 4px 20px rgba(212, 175, 55, 0.35);
+        transform: translateY(-2px);
+    }
+    [data-testid="stMetricLabel"] {
+        color: #A0AAB0 !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stMetricValue"] {
+        color: #FFFFFF !important;
+        font-weight: bold !important;
+    }
+
+    /* Customizing Table/Dataframe */
+    [data-testid="stDataFrame"] {
+        border: 1px solid rgba(212, 175, 55, 0.3);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    /* Customizing Download Button */
+    .stDownloadButton button {
+        background: linear-gradient(90deg, #D4AF37 0%, #AA7C11 100%) !important;
+        color: #0E1117 !important;
+        font-weight: bold !important;
+        border-radius: 8px !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        box-shadow: 0px 0px 10px rgba(212, 175, 55, 0.3);
+        transition: all 0.3s ease;
+    }
+    .stDownloadButton button:hover {
+        box-shadow: 0px 0px 18px rgba(212, 175, 55, 0.7);
+        transform: translateY(-2px);
+    }
+
+    /* Customizing Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #14171F;
+        border-right: 1px solid rgba(212, 175, 55, 0.2);
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # ----------------------------------------------------------------------------
 # Theme tokens
 # ----------------------------------------------------------------------------
@@ -256,236 +329,33 @@ st.markdown(f"<p style='color:{TEXT_MUTED}; margin-top:0;'>Real-time portfolio t
 if trigger_unsafe_trade:
     st.error("🚨 **SECURITY ALERT:** High-frequency arbitrage bot attempted a high-leverage trade (100x BTC). **ACTION: BLOCKED BY RISK-MANAGER AGENT**")
 
-# ----------------------------------------------------------------------------
-# Real backtested portfolio stats (Backtester runs the SAME rule logic as
-# DebateEngine over historical prices — cached per symbol/timeframe so we
-# don't re-run it on every Streamlit rerun/widget interaction).
-# ----------------------------------------------------------------------------
-TIMEFRAME_TO_PERIOD = {
-    "Live (1D)": "3mo",
-    "1 Week": "3mo",
-    "1 Month": "6mo",
-    "1 Year": "1y",
-}
-backtest_period = TIMEFRAME_TO_PERIOD.get(timeframe, "6mo")
-cache_key = f"{symbol}_{backtest_period}"
+# Charts Section
+chart_col1, chart_col2 = st.columns([2, 1])
 
-if st.session_state.get("bt_cache_key") != cache_key:
-    with st.spinner(f"Backtesting {symbol} over {backtest_period}..."):
-        st.session_state["bt_result"] = backtester.run(symbol, period=backtest_period)
-        st.session_state["bt_cache_key"] = cache_key
+with chart_col1:
+    st.subheader("📈 Portfolio Value Growth")
+    time_series = pd.date_range(end=datetime.datetime.now(), periods=10, freq="1h")
+    base_values = [100000, 100500, 101200, 100800, 102000, 102500, 103100, 104000, 104200, portfolio_val]
+    growth_data = pd.DataFrame({
+        "Time": time_series,
+        "Portfolio Value ($)": base_values
+    })
+    fig_growth = px.line(growth_data, x="Time", y="Portfolio Value ($)", markers=True, template="plotly_dark")
+    fig_growth.update_traces(line_color='#00FFA3')
+    st.plotly_chart(fig_growth, use_container_width=True)
 
-bt = st.session_state["bt_result"]
-equity_curve = bt["equity_curve"]
+with chart_col2:
+    st.subheader("📊 Asset Allocation")
+    allocation_data = pd.DataFrame({
+        "Asset": ["AAPL", "NVDA", "TSLA", "BTC", "Cash"],
+        "Value ($)": [30000, 25000, 15000, 12750, cash_val]
+    })
+    fig_pie = px.pie(allocation_data, names="Asset", values="Value ($)", hole=0.4, template="plotly_dark")
+    st.plotly_chart(fig_pie, use_container_width=True)
 
-portfolio_val = bt["ending_capital"]
-if len(equity_curve) >= 2:
-    todays_pnl = round(float(equity_curve.iloc[-1] - equity_curve.iloc[-2]), 2)
-else:
-    todays_pnl = 0.0
-pnl_sign = "+" if todays_pnl >= 0 else ""
-pnl_color = GREEN if todays_pnl >= 0 else RED
+st.divider()
 
-total_return_pct = bt["total_return_pct"]
-total_return_abs = round(portfolio_val - bt["starting_capital"], 2)
-
-win_count, total_trades = bt["win_count"], bt["total_trades"]
-win_rate = bt["win_rate_pct"]
-
-sharpe_ratio = bt["sharpe_ratio"]
-max_drawdown = bt["max_drawdown_pct"]
-
-# ----------------------------------------------------------------------------
-# Row 1 — 5 key metric cards
-# ----------------------------------------------------------------------------
-c1, c2, c3, c4, c5 = st.columns(5)
-
-with c1:
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">PORTFOLIO VALUE</div>
-        <div class="metric-value">${portfolio_val:,.2f}</div>
-        <div class="metric-sub" style="color:{pnl_color};">{pnl_sign}${abs(todays_pnl):,.2f} today</div>
-    </div>""", unsafe_allow_html=True)
-
-with c2:
-    return_color = GREEN if total_return_abs >= 0 else RED
-    return_sign = "+" if total_return_abs >= 0 else "-"
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">TOTAL RETURN</div>
-        <div class="metric-value">{total_return_pct}%</div>
-        <div class="metric-sub" style="color:{return_color};">{return_sign}${abs(total_return_abs):,.2f} backtested</div>
-    </div>""", unsafe_allow_html=True)
-
-with c3:
-    win_color = GREEN if win_rate >= 50 else (AMBER if win_rate >= 35 else RED)
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">WIN RATE</div>
-        <div class="metric-value">{win_rate}%</div>
-        <div class="metric-sub" style="color:{win_color};">{win_count} / {total_trades} trades</div>
-    </div>""", unsafe_allow_html=True)
-
-with c4:
-    sharpe_label = "Excellent" if sharpe_ratio >= 1.5 else ("Decent" if sharpe_ratio >= 0.5 else ("Weak" if sharpe_ratio >= 0 else "Negative"))
-    sharpe_color = GREEN if sharpe_ratio >= 1.0 else (AMBER if sharpe_ratio >= 0 else RED)
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">SHARPE RATIO</div>
-        <div class="metric-value">{sharpe_ratio}</div>
-        <div class="metric-sub" style="color:{sharpe_color};">{sharpe_label}</div>
-    </div>""", unsafe_allow_html=True)
-
-with c5:
-    dd_label = "Well Controlled" if max_drawdown <= 10 else ("Moderate" if max_drawdown <= 20 else "High Risk")
-    dd_color = GREEN if max_drawdown <= 10 else (AMBER if max_drawdown <= 20 else RED)
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-label">MAX DRAWDOWN</div>
-        <div class="metric-value">{max_drawdown}%</div>
-        <div class="metric-sub" style="color:{dd_color};">{dd_label}</div>
-    </div>""", unsafe_allow_html=True)
-
-st.write("")
-
-# ----------------------------------------------------------------------------
-# Row 2 — Portfolio chart | Latest AI Decision | Sentiment donut
-# ----------------------------------------------------------------------------
-col_chart, col_decision, col_sentiment = st.columns([2, 1.2, 1])
-
-with col_chart:
-    with panel(f"📈 Portfolio Performance — {symbol} Backtest ({backtest_period})"):
-        if len(equity_curve) > 0:
-            growth_data = pd.DataFrame({"Time": equity_curve.index, "Value": equity_curve.values})
-        else:
-            # Empty backtest (e.g. brand-new/illiquid symbol) — flat line fallback
-            growth_data = pd.DataFrame({
-                "Time": pd.date_range(end=datetime.datetime.now(), periods=2, freq="D"),
-                "Value": [portfolio_val, portfolio_val]
-            })
-
-        fig_growth = go.Figure()
-        fig_growth.add_trace(go.Scatter(
-            x=growth_data["Time"], y=growth_data["Value"],
-            mode="lines", line=dict(color=PURPLE, width=3),
-            fill="tozeroy", fillcolor="rgba(139, 92, 246, 0.10)",
-        ))
-        fig_growth.update_layout(
-            template="plotly_dark", paper_bgcolor=CARD_BG, plot_bgcolor=CARD_BG,
-            margin=dict(l=10, r=10, t=10, b=10), height=300,
-            xaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
-            yaxis=dict(gridcolor="rgba(255,255,255,0.05)", tickprefix="$"),
-        )
-        st.plotly_chart(fig_growth, use_container_width=True, config={"displayModeBar": False})
-
-with col_decision:
-    with panel(f"💡 Latest AI Decision — {symbol}"):
-        run_debate_btn = st.button("🚀 Run Live Agent Debate", use_container_width=True)
-        result = st.session_state.get("last_decision")
-
-        if run_debate_btn:
-            with st.spinner(f"Running multi-agent consensus for {symbol}..."):
-                payload = collector.fetch_stock_payload(symbol, risk_tolerance=risk_level)
-                result = engine.run_debate(payload)
-                st.session_state["last_decision"] = result
-
-        if result:
-            badge_class = {"BUY": "badge-buy", "SELL": "badge-sell", "HOLD": "badge-hold"}[result.action]
-            st.markdown(f'<span class="decision-badge {badge_class}">{result.action}</span>', unsafe_allow_html=True)
-            st.write("")
-            st.markdown(f'<div class="row-line"><span class="row-label">Confidence</span><span class="row-value">{int(result.confidence*100)}%</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="row-line"><span class="row-label">Position Size</span><span class="row-value">{result.position_size_pct}%</span></div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="row-line"><span class="row-label">Hedge Required</span><span class="row-value">{"Yes" if result.hedge_required else "No"}</span></div>', unsafe_allow_html=True)
-            st.caption(result.reasoning)
-            with st.expander("Bull / Bear case"):
-                st.markdown(f"**🐂 Bull:** {result.bull_case}")
-                st.markdown(f"**🐻 Bear:** {result.bear_case}")
-        else:
-            st.caption("Run the agent debate to see the latest AI decision here.")
-
-with col_sentiment:
-    with panel("📡 Sentiment Analysis"):
-        pos, neu, neg = 82, 12, 6
-        sentiment_score = round(pos / 100, 2)
-
-        fig_sent = go.Figure(data=[go.Pie(
-            labels=["Positive", "Neutral", "Negative"], values=[pos, neu, neg],
-            hole=0.72, marker=dict(colors=[GREEN, AMBER, RED]), textinfo="none", sort=False,
-        )])
-        fig_sent.update_layout(
-            template="plotly_dark", paper_bgcolor=CARD_BG, plot_bgcolor=CARD_BG,
-            margin=dict(l=0, r=0, t=0, b=0), height=170, showlegend=False,
-            annotations=[dict(text=f"<b>{sentiment_score}</b><br><span style='font-size:11px;color:{GREEN}'>BULLISH</span>",
-                               x=0.5, y=0.5, font_size=18, showarrow=False, font_color=TEXT_PRIMARY)]
-        )
-        st.plotly_chart(fig_sent, use_container_width=True, config={"displayModeBar": False})
-        st.markdown(f'<div class="row-line"><span class="row-label">🟢 Positive</span><span class="row-value">{pos}%</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="row-line"><span class="row-label">🟡 Neutral</span><span class="row-value">{neu}%</span></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="row-line"><span class="row-label">🔴 Negative</span><span class="row-value">{neg}%</span></div>', unsafe_allow_html=True)
-
-# ----------------------------------------------------------------------------
-# Row 3 — Market Overview | Asset Allocation | Performance Metrics | Open Positions
-# ----------------------------------------------------------------------------
-col_mkt, col_alloc, col_perf, col_pos = st.columns([1, 1, 1, 1.3])
-
-with col_mkt:
-    with panel("🌐 Market Overview"):
-        market_rows = [
-            ("S&P 500", "5,312.85", "+0.65%", True),
-            ("NASDAQ 100", "18,302.11", "+0.92%", True),
-            ("DOW JONES", "38,840.12", "+0.35%", True),
-            ("VIX", "14.35", "-1.65%", False),
-            ("10Y YIELD", "4.42%", "-0.28%", False),
-        ]
-        for name, val, chg, up in market_rows:
-            color = GREEN if up else RED
-            arrow = "▲" if up else "▼"
-            st.markdown(f"""
-            <div class="row-line">
-                <span class="row-label">{name}</span>
-                <span class="row-value">{val} <span style="color:{color};">{arrow} {chg}</span></span>
-            </div>""", unsafe_allow_html=True)
-
-with col_alloc:
-    with panel("🥧 Asset Allocation"):
-        alloc_labels = ["Equities", "Options", "Cash", "Others"]
-        alloc_values = [60.2, 25.7, 10.1, 4.0]
-        fig_alloc = go.Figure(data=[go.Pie(
-            labels=alloc_labels, values=alloc_values, hole=0.65,
-            marker=dict(colors=[BLUE, PURPLE, GREEN, AMBER]), textinfo="none",
-        )])
-        fig_alloc.update_layout(
-            template="plotly_dark", paper_bgcolor=CARD_BG, plot_bgcolor=CARD_BG,
-            margin=dict(l=0, r=0, t=0, b=0), height=150, showlegend=False,
-            annotations=[dict(text=f"<b>${portfolio_val/1000:.1f}K</b><br><span style='font-size:10px;color:{TEXT_MUTED}'>Total Assets</span>",
-                               x=0.5, y=0.5, font_size=14, showarrow=False, font_color=TEXT_PRIMARY)]
-        )
-        st.plotly_chart(fig_alloc, use_container_width=True, config={"displayModeBar": False})
-        for label, val, color in zip(alloc_labels, alloc_values, [BLUE, PURPLE, GREEN, AMBER]):
-            st.markdown(f'<div class="row-line"><span class="row-label">● {label}</span><span class="row-value">{val}%</span></div>', unsafe_allow_html=True)
-
-with col_perf:
-    with panel("📐 Performance Metrics"):
-        perf_rows = [("Alpha", "1.85"), ("Beta", "0.92"), ("Sortino Ratio", "2.71"),
-                     ("Calmar Ratio", "3.42"), ("Profit Factor", "2.35"), ("Expectancy", "$126.54")]
-        for name, val in perf_rows:
-            st.markdown(f'<div class="row-line"><span class="row-label">{name}</span><span class="row-value">{val}</span></div>', unsafe_allow_html=True)
-
-with col_pos:
-    with panel("📂 Open Positions"):
-        positions_data = pd.DataFrame({
-            "Symbol": [symbol, "MSFT", "SPY PUT", "TSLA", "QQQ PUT"],
-            "Type": ["BUY", "BUY", "OPTION", "BUY", "OPTION"],
-            "Size": [50, 30, 5, 20, 3],
-            "P&L": [1125.00, 780.50, 645.25, -120.30, 210.75],
-            "P&L %": ["+2.15%", "+1.85%", "+3.25%", "-0.45%", "+1.35%"],
-        })
-        st.dataframe(positions_data, use_container_width=True, hide_index=True, height=210)
-
-# ----------------------------------------------------------------------------
-# Trade history + AI agent logs
-# ----------------------------------------------------------------------------
+# Trade History & AI Agent Logs
 left_col, right_col = st.columns([2, 1])
 
 with left_col:
