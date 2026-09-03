@@ -1,29 +1,9 @@
-import os
-from typing import Dict, Any
-from pydantic import BaseModel, Field
-from dotenv import load_dotenv
-from langchain_groq import ChatGroq
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_core.prompts import PromptTemplate
+import json
+from typing import Dict, Any, List, Tuple
 
-load_dotenv()
-
-# ==========================================
-# 1. STRICT WINNER-GRADE OUTPUT SCHEMA
-# ==========================================
-class AgentDecisionSchema(BaseModel):
-    symbol: str = Field(description="Stock ticker symbol (e.g., AAPL, NVDA)")
-    action: str = Field(description="Final Trading Decision: MUST be 'BUY', 'SELL', or 'HOLD'")
-    confidence: float = Field(description="Consensus confidence score between 0.0 and 1.0")
-    bull_case: str = Field(description="Key argument presented by Bullish Growth Agent")
-    bear_case: str = Field(description="Key argument presented by Bearish Risk Agent")
-    reasoning: str = Field(description="Synthesis & final rationale by Portfolio Risk Manager")
-    hedge_required: bool = Field(description="True if high volatility requires buying a protective Put Option")
+from aegis_schemas import TradeDecision
 
 
-# ==========================================
-# 2. MULTI-AGENT DEBATE ENGINE CLASS
-# ==========================================
 class DebateEngine:
     def __init__(self):
         self.groq_key = os.getenv("GROQ_API_KEY")
@@ -134,14 +114,15 @@ class DebateEngine:
             action, hedge = "HOLD", False
             reason = f"Consensus score ({round(combined_score, 2)}) insufficient for position entry."
 
-        return AgentDecisionSchema(
+        return TradeDecision(
             symbol=symbol,
             action=action,
-            confidence=round(combined_score, 2),
-            bull_case="RSI and sentiment score show upside trajectory.",
-            bear_case="High volatility index introduces downside risk.",
-            reasoning=reason,
-            hedge_required=hedge
+            confidence=confidence,
+            hedge_required=hedge_required,
+            reasoning=reasoning,
+            bull_case=bull_case,
+            bear_case=bear_case,
+            position_size_pct=position_size_pct,
         )
 
     def run_debate(self, payload: Dict[str, Any]) -> AgentDecisionSchema:
@@ -150,20 +131,20 @@ class DebateEngine:
 
 
 if __name__ == "__main__":
-    sample_input = {
+    sample_payload = {
         "symbol": "AAPL",
         "market_data": {
             "current_price": 185.50,
             "rsi_14": 28.0,
             "macd_signal": "BULLISH",
-            "volatility_index": 0.30
+            "volatility_index": 0.25,
         },
         "sentiment_data": {
-            "news_headline_score": 0.82,
-            "overall_sentiment": "BULLISH"
-        }
+            "news_headline_score": 0.6,
+            "overall_sentiment": "BULLISH",
+        },
+        "risk_tolerance": 7,
     }
-
     engine = DebateEngine()
     output = engine.run_debate(sample_input)
     
