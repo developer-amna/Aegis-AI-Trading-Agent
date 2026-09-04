@@ -31,7 +31,7 @@ class IngestionWorker:
     async def _run(self) -> None:
         while not self._stop.is_set():
             try:
-                await self.pipeline.run_once()
+                await self.pipeline.run_once(list(self.pipeline.entity_extractor.company_mapping.keys()))
             except Exception:
                 logger.exception("NEWS_WORKER_CYCLE_FAILED")
             try:

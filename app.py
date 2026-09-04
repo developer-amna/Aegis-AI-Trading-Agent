@@ -894,6 +894,18 @@ elif menu == "📰 News & Sentiment":
 elif menu == "🛡️ Risk Management":
     st.title("🛡️ Risk Management Panel")
     
+    # Custom CSS to force high-contrast text color for st.metric in dark mode
+    st.markdown("""
+        <style>
+        [data-testid="stMetricLabel"] {
+            color: #A0AEC0 !important; /* Lighter grey for labels */
+        }
+        [data-testid="stMetricValue"] {
+            color: #FFFFFF !important; /* Pure white for numbers */
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     # Retrieve dynamic live values from risk_manager if available
     if BACKEND_AVAILABLE:
         max_allocation = risk_manager.max_capital_allocation * 100
