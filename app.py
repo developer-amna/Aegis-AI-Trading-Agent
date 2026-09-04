@@ -976,6 +976,11 @@ elif menu == "🛡️ Risk Management":
 # ==========================================
 elif menu == "⚙️ Settings":
     st.title("⚙️ System Preferences")
+    
+    if BACKEND_AVAILABLE and executor.client:
+        st.success("🟢 Alpaca Paper Trading Connected")
+    else:
+        st.error("🔴 Alpaca Paper Trading Not Connected")
     with st.form("settings_form"):
         s_col1, s_col2 = st.columns(2)
         with s_col1:
