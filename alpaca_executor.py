@@ -7,42 +7,103 @@ from alpaca.trading.enums import OrderSide, TimeInForce
 
 load_dotenv()
 
+
 class AlpacaExecutionEngine:
     def __init__(self):
         # Fetch Alpaca Paper Trading Credentials from .env
         self.api_key = os.getenv("ALPACA_API_KEY")
         self.secret_key = os.getenv("ALPACA_SECRET_KEY")
-        
-        # Paper Trading Paper = True flag
+
+        # Paper Trading
         if self.api_key and self.secret_key:
-            self.client = TradingClient(self.api_key, self.secret_key, paper=True)
+            self.client = TradingClient(
+                self.api_key,
+                self.secret_key,
+                paper=True
+            )
+
             print("🟢 [Task 3: Alpaca Executor] Paper Trading Engine Connected.")
+
+            # ---------------------------------------------------------
+            # Verify API Key + Secret Key
+            # ---------------------------------------------------------
+            try:
+                account = self.client.get_account()
+
+                print("✅ API KEY + SECRET KEY VERIFIED SUCCESSFULLY")
+                print(f"✅ Paper Account Status: {account.status}")
+                print(f"✅ Buying Power: ${account.buying_power}")
+
+            except Exception as e:
+                print("❌ API KEY / SECRET KEY VERIFICATION FAILED")
+                print(f"Error: {e}")
+
         else:
             self.client = None
-            print("⚠️ [Task 3: Alpaca Executor] API Keys missing. Running in Simulation Mode.")
+            print(
+                "⚠️ [Task 3: Alpaca Executor] "
+                "API Keys missing. Running in Simulation Mode."
+            )
 
-    def execute_decision(self, decision: Dict[str, Any], qty: int = 1) -> Dict[str, Any]:
+    def execute_decision(
+        self,
+        decision: Dict[str, Any],
+        qty: int = 1
+    ) -> Dict[str, Any]:
         """
-        Translates Aegis-AI Consensus Schema into Alpaca Order Execution
+        Translates Aegis-AI Consensus Schema
+        into Alpaca Paper Order Execution.
         """
+
         symbol = decision.get("symbol", "AAPL")
         action = decision.get("action", "HOLD").upper()
         confidence = decision.get("confidence", 0.0)
         hedge_required = decision.get("hedge_required", False)
 
+        # ---------------------------------------------------------
+        # HOLD = No Order
+        # ---------------------------------------------------------
         if action == "HOLD":
-            print(f"⏸️ [Execution Skipped] Action is HOLD for {symbol}. No trade placed.")
-            return {"status": "skipped", "reason": "HOLD action received"}
+            print(
+                f"⏸️ [Execution Skipped] "
+                f"Action is HOLD for {symbol}. No trade placed."
+            )
 
+            return {
+                "status": "skipped",
+                "reason": "HOLD action received"
+            }
+
+        # ---------------------------------------------------------
+        # Simulation Mode if API credentials are missing
+        # ---------------------------------------------------------
         if not self.client:
-            print(f"🧪 [Simulated Order] {action} {qty} share(s) of {symbol} (Confidence: {confidence})")
-            return {"status": "simulated", "symbol": symbol, "action": action, "qty": qty}
+            print(
+                f"🧪 [Simulated Order] "
+                f"{action} {qty} share(s) of {symbol} "
+                f"(Confidence: {confidence})"
+            )
+
+            return {
+                "status": "simulated",
+                "symbol": symbol,
+                "action": action,
+                "qty": qty
+            }
 
         try:
+            # ---------------------------------------------------------
             # Map BUY / SELL actions
-            order_side = OrderSide.BUY if action == "BUY" else OrderSide.SELL
+            # ---------------------------------------------------------
+            order_side = (
+                OrderSide.BUY
+                if action == "BUY"
+                else OrderSide.SELL
+            )
 
-            # Formulate Market Order
+            # ---------------------------------------------------------
+            # Create Market Order
+            # ---------------------------------------------------------
             order_data = MarketOrderRequest(
                 symbol=symbol,
                 qty=qty,
@@ -50,9 +111,13 @@ class AlpacaExecutionEngine:
                 time_in_force=TimeInForce.DAY
             )
 
-            # Submit Order via Alpaca SDK
-            order = self.client.submit_order(order_data=order_data)
-            
+            # ---------------------------------------------------------
+            # Submit Order through Alpaca Paper Trading API
+            # ---------------------------------------------------------
+            order = self.client.submit_order(
+                order_data=order_data
+            )
+
             execution_log = {
                 "status": "executed",
                 "order_id": str(order.id),
@@ -63,27 +128,54 @@ class AlpacaExecutionEngine:
                 "hedge_flag_triggered": hedge_required
             }
 
-            print(f"🚀 [Alpaca Live Order Success] {action} {qty} share(s) of {symbol} | Order ID: {order.id}")
-            
+            print(
+                f"🚀 [Alpaca Paper Order Success] "
+                f"{action} {qty} share(s) of {symbol} "
+                f"| Order ID: {order.id}"
+            )
+
+            # ---------------------------------------------------------
+            # Hedge Signal
+            # ---------------------------------------------------------
             if hedge_required:
-                print(f"🛡️ [Risk Hedge Signal] Volatility flag active for {symbol}. Protective Put option recommended.")
+                print(
+                    f"🛡️ [Risk Hedge Signal] "
+                    f"Volatility flag active for {symbol}. "
+                    f"Protective Put option recommended."
+                )
 
             return execution_log
 
         except Exception as e:
-            print(f"❌ [Alpaca Execution Failed]: {str(e)}")
-            return {"status": "error", "message": str(e)}
+            print(
+                f"❌ [Alpaca Execution Failed]: {str(e)}"
+            )
+
+            return {
+                "status": "error",
+                "message": str(e)
+            }
+
+
+# ============================================================================
+# TEST EXECUTION
+# ============================================================================
 
 if __name__ == "__main__":
-    # Test Execution
+
     sample_decision = {
         "symbol": "AAPL",
         "action": "BUY",
         "confidence": 0.85,
         "hedge_required": False
     }
-    
+
     executor = AlpacaExecutionEngine()
-    response = executor.execute_decision(sample_decision, qty=2)
+
+    response = executor.execute_decision(
+        sample_decision,
+        qty=2
+    )
+
     print("\nExecution Response:")
     print(response)

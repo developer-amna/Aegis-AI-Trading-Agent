@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class NewsSentimentPipeline:
     def __init__(self, providers: List[NewsProvider], repository, cleaner: ArticleCleaner, deduplicator: ArticleDeduplicator,
-                 entity_extractor: EntityExtractor, engine: SentimentEngine, lookback_minutes: int = 60,
+                 entity_extractor: EntityExtractor, engine: SentimentEngine, lookback_minutes: int = 1440,
                  relevance_filter: Optional[FinancialRelevanceFilter] = None):
         self.providers = providers
         self.repository = repository
