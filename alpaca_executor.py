@@ -1,4 +1,5 @@
 import os
+import streamlit as st
 from typing import Dict, Any
 from dotenv import load_dotenv
 from alpaca.trading.client import TradingClient
@@ -11,8 +12,8 @@ load_dotenv()
 class AlpacaExecutionEngine:
     def __init__(self):
         # Fetch Alpaca Paper Trading Credentials from .env
-        self.api_key = os.getenv("ALPACA_API_KEY")
-        self.secret_key = os.getenv("ALPACA_SECRET_KEY")
+        self.api_key = st.secrets.get("ALPACA_API_KEY", os.getenv("ALPACA_API_KEY"))
+        self.secret_key = st.secrets.get("ALPACA_SECRET_KEY", os.getenv("ALPACA_SECRET_KEY"))
 
         # Paper Trading
         if self.api_key and self.secret_key:
